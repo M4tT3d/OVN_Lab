@@ -4,15 +4,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pandas import DataFrame
 
+from lightpath import Lightpath
 from line import Line
 from node import Node
-from signal_information import SignalInformation
 
 
 def distance_node(xy_node1, xy_node2):
     dx = (xy_node2[0] - xy_node1[0]) ** 2
     dy = (xy_node2[1] - xy_node1[1]) ** 2
     return (dx + dy) ** (1 / 2)
+
+
+def path_to_line(path):
+    path = path.replace("->", "")
+    return [path[i] + path[i + 1] for i in range(len(path) - 1)]
 
 
 class Network:
@@ -23,6 +28,7 @@ class Network:
             self._lines = dict()
             self._weighted_paths = None
             self._connected = False
+            self._route_space = None
             for node_label in data:
                 node_data = data[node_label]
                 node_data['label'] = node_label.upper()
@@ -103,27 +109,27 @@ class Network:
                     else:
                         path_label += path[i] + "->"
                 df_data['path'].append(path_label)
-                sig = self.propagate(SignalInformation(signal_power, path))
+                sig = self.propagate(Lightpath(signal_power, path, 0))
                 df_data['latency'].append(sig.latency)
                 df_data['noise'].append(sig.noise_power)
                 df_data['SNR'].append(10 * np.log10(sig.signal_power / sig.noise_power))
         self._weighted_paths = DataFrame(df_data)
+        route_space = DataFrame()
+        route_space['path'] = df_data['path']
+        for i in range(10):
+            route_space[str(i)] = ['free' for i in range(len(df_data['path']))]
+        self._route_space = route_space
 
     def available_paths(self, start_node, final_node):
         if self._weighted_paths is None:
             self.set_weighted_paths(1)
         paths = [path for path in self._weighted_paths['path'].values if
                  (start_node.upper() == path[0]) and (final_node.upper() == path[-1])]
-        unavailable_lines = [line for line in self._lines if self._lines[line].state == "occupied"]
         available_paths = list()
         for path in paths:
-            available = True
-            for line in unavailable_lines:
-                if (line[0] + "->" + line[1]) in path:
-                    available = False
-                    break
-            if available:
-                available_paths.append(path)
+            free_path_channels = self._route_space.loc[self._route_space.path == path].T.values[1:]
+        if 'free' in free_path_channels:
+            available_paths.append(path)
         return available_paths
 
     def find_best_snr(self, start_node, final_node):
@@ -131,7 +137,7 @@ class Network:
         if paths:
             best_snr = self._weighted_paths.loc[self._weighted_paths.path.isin(paths)].SNR.values.max()
             best_path = self._weighted_paths.loc[best_snr == self._weighted_paths.SNR].path.values[0]
-            return best_path.replace("->", "")
+            return best_path
         return None
 
     def find_best_latency(self, start_node, final_node):
@@ -139,7 +145,7 @@ class Network:
         if paths:
             best_latency = self._weighted_paths.loc[self._weighted_paths.path.isin(paths)].latency.values.min()
             best_path = self._weighted_paths.loc[best_latency == self._weighted_paths.latency].path.values[0]
-            return best_path.replace("->", "")
+            return best_path
         return None
 
     def stream(self, connections, best="latency"):
@@ -150,11 +156,29 @@ class Network:
             elif best == "snr":
                 path = self.find_best_snr(connection.start_node, connection.final_node)
             if path:
-                signal = self.propagate(SignalInformation(connection.signal_power, path), True)
+                free_path_channels = self._route_space.loc[self._route_space.path == path].T.values[1:]
+                for i in range(len(free_path_channels)):
+                    if free_path_channels[i] == "free":
+                        channel = i
+                        break
+                signal = self.propagate(Lightpath(connection.signal_power, path.replace("->", ""), channel), True)
                 connection.latency = signal.latency
                 connection.snr = 10 * np.log10(connection.signal_power / signal.noise_power)
+                self.update_route_space(path, channel)
             else:
                 connection.snr = 0
                 connection.latency = None
             streamed_conn.append(connection)
         return streamed_conn
+
+    def update_route_space(self, path, channel):
+        paths = [path_to_line(path) for path in self._route_space.path.values]
+        channel_state = self._route_space[str(channel)]
+        signal_path = path_to_line(path)
+        for i in range(len(paths)):
+            path = paths[i]
+            for line in signal_path:
+                if line in path:
+                    channel_state[i] = "occupied"
+                    break
+        self._route_space[str(channel)] = channel_state
