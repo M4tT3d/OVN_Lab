@@ -17,9 +17,9 @@ class Node:
     def position(self):
         return self._position
 
-    def propagate(self, signal):
+    def propagate(self, signal, occupation=False):
         if len(signal.path) > 1:
             line_label = signal.path[:2]
             signal.next_node()
-            signal = self._successive[line_label].propagate(signal)
+            signal = self._successive[line_label].propagate(signal, occupation)
         return signal
