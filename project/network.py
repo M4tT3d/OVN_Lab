@@ -1,3 +1,4 @@
+import itertools
 import json
 
 import matplotlib.pyplot as plt
@@ -17,7 +18,22 @@ def distance_node(xy_node1, xy_node2):
 
 def path_to_line(path):
     path = path.replace("->", "")
-    return [path[i] + path[i + 1] for i in range(len(path) - 1)]
+    return set([path[i] + path[i + 1] for i in range(len(path) - 1)])
+
+
+def line_set_to_path(line_set):
+    path = ""
+    elements = list(itertools.permutations(list(line_set), len(list(line_set))))
+    for i in range(len(elements)):
+        flag = 1
+        for j in range(len(elements[i]) - 1):
+            if elements[i][j][1] != elements[i][j + 1][0]:
+                flag = 0
+            j += 2
+        if flag == 1:
+            for j in range(len(elements[i])):
+                path += elements[i][j][0]
+            return path
 
 
 class Network:
@@ -29,6 +45,7 @@ class Network:
             self._weighted_paths = None
             self._connected = False
             self._route_space = None
+            self._channels = 10
             for node_label in data:
                 node_data = data[node_label]
                 node_data['label'] = node_label.upper()
@@ -46,10 +63,17 @@ class Network:
 
     def connect(self):
         for node_label in self._nodes:
+            matrix = dict()
             for adj_node_label in self._nodes[node_label].connected_nodes:
+                inner_dict = {adj_node_label: np.zeros(self._channels)}
+                for adj_node_label2 in self._nodes[node_label].connected_nodes:
+                    if adj_node_label2 != adj_node_label:
+                        inner_dict.update({adj_node_label2: np.ones(self._channels)})
+                matrix.update({adj_node_label: inner_dict})
                 line_label = node_label + adj_node_label
                 self._lines[line_label].successive[adj_node_label] = self._nodes[adj_node_label]
                 self._nodes[node_label].successive[line_label] = self._lines[line_label]
+            self._nodes[node_label].switching_matrix = matrix
         self._connected = True
 
     def _search_all_paths(self, first_node, last_node, visited, path, paths):
@@ -116,7 +140,8 @@ class Network:
         self._weighted_paths = DataFrame(df_data)
         route_space = DataFrame()
         route_space['path'] = df_data['path']
-        for i in range(10):
+        # set free route space
+        for i in range(self._channels):
             route_space[str(i)] = ['free' for i in range(len(df_data['path']))]
         self._route_space = route_space
 
@@ -174,11 +199,16 @@ class Network:
     def update_route_space(self, path, channel):
         paths = [path_to_line(path) for path in self._route_space.path.values]
         channel_state = self._route_space[str(channel)]
-        signal_path = path_to_line(path)
+        signal_line = path_to_line(path)
         for i in range(len(paths)):
-            path = paths[i]
-            for line in signal_path:
-                if line in path:
-                    channel_state[i] = "occupied"
-                    break
+            path_line = paths[i]
+            if signal_line.intersection(path_line):
+                channel_state[i] = 'occupied'
+                path_to_update = self.line_set_to_path(path_line)
+                for j in range(len(path_to_update)):
+                    if j not in (0, len(path_to_update) - 1):
+                        if ((path_to_update[j - 1] in self.nodes[path_to_update[j]].connected_nodes) & (
+                                path_to_update[j + 1] in self.nodes[path_to_update[j]].connected_nodes)):
+                            self.nodes[path_to_update[j]].switching_matrix[path_to_update[j - 1]][
+                                path_to_update[j + 1]][channel] = 0
         self._route_space[str(channel)] = channel_state

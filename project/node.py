@@ -4,6 +4,7 @@ class Node:
         self._position = tuple(data['position'])
         self._connected_nodes = data['connected_nodes']
         self._successive = dict()
+        self._switching_matrix = None
 
     @property
     def connected_nodes(self):
@@ -16,6 +17,14 @@ class Node:
     @property
     def position(self):
         return self._position
+
+    @property
+    def switching_matrix(self):
+        return self._switching_matrix
+
+    @switching_matrix.setter
+    def switching_matrix(self, matrix):
+        self._switching_matrix = matrix
 
     def propagate(self, signal, occupation=False):
         if len(signal.path) > 1:
