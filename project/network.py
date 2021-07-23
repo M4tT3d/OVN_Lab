@@ -4,6 +4,8 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 from pandas import DataFrame
+from pandas import array as pdArray
+from scipy import special as math
 
 from lightpath import Lightpath
 from line import Line
@@ -49,6 +51,8 @@ class Network:
             for node_label in data:
                 node_data = data[node_label]
                 node_data['label'] = node_label.upper()
+                if 'transceiver' not in node_data:
+                    node_data['transceiver'] = 'fixed_rate'
                 self._nodes[node_label] = Node(node_data)
                 for adj_node_label in data[node_label]['connected_nodes']:
                     line_dict = dict()
@@ -186,6 +190,8 @@ class Network:
                     if free_path_channels[i] == "free":
                         channel = i
                         break
+                connection.bit_rate = self.calculate_bit_rate(Lightpath(connection.signal_power, path, channel),
+                                                              self._nodes[connection.start_node].transceiver)
                 signal = self.propagate(Lightpath(connection.signal_power, path.replace("->", ""), channel), True)
                 connection.latency = signal.latency
                 connection.snr = 10 * np.log10(connection.signal_power / signal.noise_power)
@@ -204,7 +210,7 @@ class Network:
             path_line = paths[i]
             if signal_line.intersection(path_line):
                 channel_state[i] = 'occupied'
-                path_to_update = self.line_set_to_path(path_line)
+                path_to_update = line_set_to_path(path_line)
                 for j in range(len(path_to_update)):
                     if j not in (0, len(path_to_update) - 1):
                         if ((path_to_update[j - 1] in self.nodes[path_to_update[j]].connected_nodes) & (
@@ -212,3 +218,32 @@ class Network:
                             self.nodes[path_to_update[j]].switching_matrix[path_to_update[j - 1]][
                                 path_to_update[j + 1]][channel] = 0
         self._route_space[str(channel)] = channel_state
+
+    def calculate_bit_rate(self, lightpath, strategy):
+        ber_t = 1e-3
+        bn = 12.5e9
+        rb = 0
+        rs = lightpath.rs
+        path = lightpath.path
+        gsnr_db = pdArray(self._weighted_paths.loc[self._weighted_paths['path'] == path]['SNR'])[0]
+        gsnr = 10 ** (gsnr_db / 10)
+
+        if strategy == 'fixed_rate':
+            if gsnr > 2 * math.erfcinv(2 * ber_t) ** 2 * (rs / bn):
+                rb = 100
+            else:
+                rb = 0
+        if strategy == 'flex_rate':
+            if gsnr < 2 * math.erfcinv(2 * ber_t) ** 2 * (rs / bn):
+                rb = 0
+            elif (gsnr > 2 * math.erfcinv(2 * ber_t) ** 2 * (rs / bn)) & (gsnr < (14 / 3) * math.erfcinv(
+                    (3 / 2) * ber_t) ** 2 * (rs / bn)):
+                rb = 100
+            elif (gsnr > (14 / 3) * math.erfcinv((3 / 2) * ber_t) ** 2 * (rs / bn)) & (gsnr < 10 * math.erfcinv(
+                    (8 / 3) * ber_t) ** 2 * (rs / bn)):
+                rb = 200
+            elif gsnr > 10 * math.erfcinv((8 / 3) * ber_t) ** 2 * (rs / bn):
+                rb = 400
+        if strategy == 'shannon':
+            rb = 2 * rs * np.log2(1 + bn / rs * gsnr) / 1e9
+        return rb

@@ -7,7 +7,7 @@ from network import Network
 
 
 def main():
-    net = Network("nodes.json")
+    net = Network("nodes_full_shannon.json")
     nodes = list(net.nodes.keys())
     connections = list()
 

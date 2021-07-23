@@ -5,6 +5,7 @@ class Node:
         self._connected_nodes = data['connected_nodes']
         self._successive = dict()
         self._switching_matrix = None
+        self._transceiver = data['transceiver']
 
     @property
     def connected_nodes(self):
@@ -25,6 +26,10 @@ class Node:
     @switching_matrix.setter
     def switching_matrix(self, matrix):
         self._switching_matrix = matrix
+
+    @property
+    def transceiver(self):
+        return self._transceiver
 
     def propagate(self, signal, occupation=False):
         if len(signal.path) > 1:
