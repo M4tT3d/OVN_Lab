@@ -1,4 +1,5 @@
-import numpy as np
+import math
+
 from scipy.constants import speed_of_light, h, pi
 
 
@@ -7,13 +8,17 @@ class Line:
         self._label = data['label']
         self._length = data['length']
         self._successive = dict()
-        self._state = ["free" for i in range(10)]
+        self._state = ['free' for _ in range(10)]
         self._n_amplifiers = int(self._length / 80e3)  # one amp every 80km
         self._gain = 16
-        self._noise_figure = 3
-        self._alpha = 0.2e-3  # fiber loss dB/m
-        self._beta2 = 2.13e-26  # 0.6e-26  #
-        self._gamma = 1.27e-3
+        self._noise_figure = 3  # 5#
+        self._fiber = {
+            "alpha": 0.2e-3 / (20 * math.log10(math.e)),
+            "beta": 2.13e-26,
+            "gamma": 1.27e-3,
+            "Rs": 32e9,
+            "df": 50e9
+        }
 
     @property
     def successive(self):
@@ -34,38 +39,47 @@ class Line:
     def latency_generation(self):
         return self._length / (speed_of_light * 2 / 3)
 
-    def noise_generation(self, signal_power):
-        return 1e-9 * signal_power * self._length
+    def noise_generation(self, lightpath):
+        noise = self.ase_generation() + self.nli_generation(lightpath.signal_power)
+        return noise
 
-    def propagate(self, signal, occupation=False):
-        signal.add_noise(self.noise_generation(signal.signal_power))
-        signal.add_latency(self.latency_generation())
+    def propagate(self, lightpath, occupation=False):
+        lightpath.add_noise(self.noise_generation(lightpath))
+        lightpath.add_latency(self.latency_generation())
+        lightpath.signal_power = self.optimized_launch_power()
         if occupation:
-            new_state = self._state.copy()
-            new_state[signal.channel] = "occupied"
+            channel = lightpath.channel
+            new_state = self.state.copy()
+            new_state[channel] = 'occupied'
             self.state = new_state
-        return self._successive[signal.path[0]].propagate(signal, occupation)
+        return self.successive[lightpath.path[0]].propagate(lightpath, occupation)
 
     def ase_generation(self):
         nf = 10 ** (self._noise_figure / 10)
-        g = 10 ** (self._gain / 10)
+        gain = 10 ** (self._gain / 10)
         f = 193.414e12
         bn = 12.5e9  # GHz
-        ase = self._n_amplifiers * h * f * bn * nf * (g - 1)
-        return ase
+        return self._n_amplifiers * (h * f * bn * nf * (gain - 1))
 
-    def nli_generation(self, signal_power, dfp, rsp):
+    def n_nli(self):
+        alpha = self._fiber['alpha']
+        beta = self._fiber['beta']
+        gamma = self._fiber['gamma']
+        rs = self._fiber['Rs']
+        df = self._fiber['df']
+        first = 16 / (27 * pi)
+        arg = ((pi ** 2) / 2) * ((beta * (rs ** 2)) / alpha) * (10 ** (2 * rs / df))
+        second = math.log2(arg)
+        third = (gamma ** 2) / (4 * alpha * beta * (rs ** 3))
+        return first * second * third
+
+    def nli_generation(self, signal_power):
         bn = 12.5e9  # GHz
-        eta_nli = self.eta_nli(dfp, rsp)
-        nli = (signal_power ** 3) * eta_nli * self._n_amplifiers * bn
-        return nli
+        return (signal_power ** 3) * self.n_nli() * bn * self._n_amplifiers
 
-    def eta_nli(self, dfp, rsp):
-        df = dfp
-        rs = rsp
-        a = self._alpha / (20 * np.log10(np.e))
-        nch = 10
-        b2 = self._beta2
-        e_nli = 16 / (27 * pi) * np.log(pi ** 2 * b2 * rs ** 2 * nch ** (2 * rs / df) / (2 * a)) * self.gamma ** 2 / (
-                    4 * a * b2 * rs ** 3)
-        return e_nli
+    def optimized_launch_power(self):
+        bn = 12.5e9
+        return (self.ase_generation() / (2 * self.n_nli() * self._n_amplifiers * bn)) ** (1 / 3)
+
+    def free_state(self):
+        self._state = ['free' for _ in range(10)]

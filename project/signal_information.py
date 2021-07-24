@@ -13,6 +13,10 @@ class SignalInformation:
     def signal_power(self):
         return self._signal_power
 
+    @signal_power.setter
+    def signal_power(self, sp):
+        self._signal_power = sp
+
     @property
     def latency(self):
         return self._latency
