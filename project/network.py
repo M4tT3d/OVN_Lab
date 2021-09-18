@@ -71,6 +71,14 @@ class Network(object):
     def nodes(self):
         return self._nodes
 
+    @property
+    def weighted_paths(self):
+        return self._weighted_paths
+
+    @property
+    def route_space(self):
+        return self._route_space
+
     # connect the network --> dict
     def connect(self):
         nodes_dict = self._nodes
@@ -120,8 +128,8 @@ class Network(object):
         return prop_s_i
     
     def draw(self):
-        font = {'family': 'serif',
-                'color': 'blue',
+        font = {'family': 'sans',
+                'color': 'black',
                 'weight': 'normal',
                 'size': 15
                 }
@@ -129,13 +137,13 @@ class Network(object):
             n0 = self._nodes[node_label]
             x0 = n0.position[0] / 1e3
             y0 = n0.position[1] / 1e3
-            plt.plot(x0, y0)
+            plt.plot(x0, y0, 'bo', markersize=7)
             plt.text(x0, y0, node_label, fontdict=font)
             for connect_n_label in n0.connected_nodes:
                 n1 = self._nodes[connect_n_label]
                 x1 = n1.position[0] / 1e3
                 y1 = n1.position[1] / 1e3
-                plt.plot([x0, x1], [y0, y1])
+                plt.plot([x0, x1], [y0, y1], color='tab:orange')
         plt.xlabel('Km')
         plt.title('Network')
         plt.show()
@@ -159,15 +167,15 @@ class Network(object):
                 for node in path:
                     path_str += node + '-->'
                 paths.append(path_str[:-3])
-                s_i = SignalInformation(signal_power, path)
+                sigInf = SignalInformation(signal_power, path)
                 if couples in self._lines.keys():
                     line = self._lines[couples]
                     signal_power = line.optimized_launch_power()
-                s_i.signal_power = signal_power
-                s_i = self.propagate(s_i, occupation=False)
-                latencies.append(s_i.latency)
-                noises.append(s_i.noise_power)
-                snrs.append(10 * np.log10(s_i.latency / s_i.noise_power))
+                sigInf.signal_power = signal_power
+                sigInf = self.propagate(sigInf, occupation=False)
+                latencies.append(sigInf.latency)
+                noises.append(sigInf.noise_power)
+                snrs.append(10 * np.log10(sigInf.signal_power / sigInf.noise_power))
         df['path'] = paths
         df['latency'] = latencies
         df['noise'] = noises

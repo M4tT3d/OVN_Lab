@@ -11,10 +11,10 @@ class Line:
         self._state = ['free' for _ in range(10)]
         self._n_amplifiers = int(self._length / 80e3)  # one amp every 80km
         self._gain = 16
-        self._noise_figure = 3  # 5#
+        self._noise_figure = 3  # 5
         self._fiber = {
             "alpha": 0.2e-3 / (20 * math.log10(math.e)),
-            "beta": 2.13e-26,
+            "beta": 2.3e-26,
             "gamma": 1.27e-3,
             "Rs": 32e9,
             "df": 50e9
