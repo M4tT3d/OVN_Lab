@@ -1,5 +1,5 @@
 import itertools
-from network import Network, plt, np
+from core.network import Network, plt, np
 from random import choice
 
 
@@ -7,7 +7,7 @@ from random import choice
 def main():
     sat_percent = 95
     # fixed rate_____________________________________________________________________________
-    network = Network('exam_net.json')
+    network = Network('jsons/exam_net.json')
     n_node = len(network.nodes.keys())
     saturation_fix = []
     ms_fix = []
@@ -49,7 +49,7 @@ def main():
     plt.show()
 
     # flex rate_____________________________________________________________________________
-    network_flex_rate = Network('exam_net.json', 'flex_rate')
+    network_flex_rate = Network('jsons/exam_net.json', 'flex_rate')
     n_node = len(network_flex_rate.nodes.keys())
     saturation_flex = []
     ms_flex = []
@@ -91,7 +91,7 @@ def main():
     plt.show()
 
     # shannon________________________________________________________________________________
-    network_shannon = Network('exam_net.json', 'shannon')
+    network_shannon = Network('jsons/exam_net.json', 'shannon')
     n_node = len(network_shannon.nodes.keys())
     saturation_shan = []
     ms_shan = []

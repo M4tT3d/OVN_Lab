@@ -1,15 +1,15 @@
 import copy
 from random import shuffle
 
-from connection import Connection
-from network import Network, plt, np
+from core.connection import Connection
+from core.network import Network, plt, np
 
 
 # used for the different values of beta2 and NF
 def main():
-    network = Network('exam_net.json')
-    network_flex_rate = Network('exam_net.json', 'flex_rate')
-    network_shannon = Network('exam_net.json', 'shannon')
+    network = Network('jsons/exam_net.json')
+    network_flex_rate = Network('jsons/exam_net.json', 'flex_rate')
+    network_shannon = Network('jsons/exam_net.json', 'shannon')
     node_labels = list(network.nodes.keys())
     connections = []
     for i in range(100):

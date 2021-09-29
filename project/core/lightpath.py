@@ -1,4 +1,4 @@
-from signal_information import SignalInformation
+from .signal_information import SignalInformation
 
 
 class Lightpath(SignalInformation):

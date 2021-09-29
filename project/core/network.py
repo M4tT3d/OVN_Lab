@@ -7,11 +7,11 @@ from pandas import DataFrame
 from pandas import array as pd_array
 from scipy import special as math
 
-from node import Node
-from connection import Connection
-from lightpath import Lightpath
-from line import Line
-from signal_information import SignalInformation
+from .node import Node
+from .connection import Connection
+from .lightpath import Lightpath
+from .line import Line
+from .signal_information import SignalInformation
 
 
 def distance_node(xy_node1, xy_node2):

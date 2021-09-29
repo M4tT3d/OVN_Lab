@@ -2,12 +2,12 @@ from random import shuffle
 
 import matplotlib.pyplot as plt
 
-from connection import Connection
-from network import Network
+from core.connection import Connection
+from core.network import Network
 
 
 def main():
-    net = Network("exam_net.json")
+    net = Network("jsons/exam_net.json")
     nodes = list(net.nodes.keys())
     connections = list()
 
@@ -20,7 +20,7 @@ def main():
     plt.hist(latencies, bins=10)
     plt.title("Latencies")
     plt.show()
-    streamed_connections = net.stream(connections)
+    streamed_connections = net.stream(connections, "snr")
     snrs = [connection.snr for connection in streamed_connections]
     plt.hist(snrs, bins=10)
     plt.title("SNRs")
